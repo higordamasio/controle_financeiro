@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load l10n %}
+
+{% block title %}Dashboard — FinControl{% endblock %}
+
+{% block content %}
+
+<!-- Topo com filtros (Ano/Mês) -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Dashboard - {{ month_name }} / {{ year }}</h3>
+  <form class="d-flex gap-2" method="get">
+    <select class="form-select" name="month" style="width:130px">
+      {% for m in months %}
+        <option value="{{ m }}" {% if month == m %}selected{% endif %}>Mês {{ m }}</option>
+      {% endfor %}
+    </select>
+    <input class="form-control" type="number" name="year" value="{{ year }}" style="width:120px">
+    <button class="btn btn-outline-primary">Filtros</button>
+  </form>
+</div>
+
+<!-- Linha: KPIs (à esquerda) + Gráfico (à direita) -->
+<div class="row g-3 mb-3 align-items-stretch">
+  <!-- KPIs -->
+  <div class="col-12 col-lg-8">
+    <div class="row g-3">
+      
+      <!-- Total Receitas -->
+      <div class="col-6 col-xl-6">
+        <div class="card border-lite h-100 p-3">
+          <div class="text-muted">Total Receitas</div>
+          <div class="h5 amount-pos mb-0">R$ {{ total_in|floatformat:2|intcomma }}</div>
+        </div>
+      </div>
+      <!-- ############ -->
+      
+      <!-- Total Despesas -->
+      <div class="col-6 col-xl-6">
+        <div class="card border-lite h-100 p-3">
+          <div class="text-muted">Total Despesas</div>
+          <div class="h5 amount-neg mb-0">R$ {{ total_ex|floatformat:2|intcomma }}</div>
+        </div>
+      </div>
+      <!-- ############ -->
+      
+      <!-- Saldo Geral -->
+      <div class="col-6 col-xl-6">
+        <div class="card border-lite h-100 p-3">
+          <div class="text-muted">Saldo Geral</div>
+          <div class="h5 {% if net >= 0 %}amount-pos{% else %}amount-neg{% endif %} mb-0">
+            R$ {{ net|floatformat:2|intcomma }}
+          </div>
+        </div>
+      </div>
+      <!-- ############ -->
+
+      <!-- Saldo Parcial -->
+      <div class="col-6 col-xl-6">
+        <div class="card border-lite h-100 p-3">
+          <div class="text-muted">Saldo Parcial (PAGO)</div>
+           <div class="h5 {% if net_paid >= 0 %}amount-pos{% else %}amount-neg{% endif %} mb-0">
+              R$ {{ net_paid|floatformat:2|intcomma }}
+           </div>
+           <!-- <small class="text-muted">Receitas pagas − Despesas pagas</small> -->
+        </div>
+      </div>
+      <!-- ############ -->
+
+      <!-- Receita Rest. -->
+      <div class="col-6 col-xl-6">
+        <div class="card border-lite h-100 p-3">
+          <div class="text-muted">% Receita Rest.</div>
+          {% if total_in %}
+            {% widthratio net total_in 100 as perc %}
+            <div class="h5 mb-0">{{ perc }}%</div>
+          {% else %}
+            <div class="h5 text-muted mb-0">–</div>
+          {% endif %}
+        </div>
+      </div>
+      <!-- ############ -->
+      
+      <!-- Gasto Diário Sug. -->
+      <div class="col-6 col-xl-6">
+        <div class="card border-lite h-100 p-3">
+          <div class="text-muted">Gasto Diário Sug.</div>
+          {% widthratio total_ex_abs 30 1 as daily %}
+          <div class="h5 amount-neg mb-0">R$ {{ daily|intcomma }}</div>
+          <!-- <small class="text-muted">aprox. (despesas/30)</small> -->
+        </div>
+      </div>
+      <!-- ############ -->
+
+    </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-soft h-100">
+      <div class="card-body d-flex flex-column">
+        <h5 class="mb-2" id="pie-title">Receitas vs Despesas</h5>
+        <div class="flex-grow-1 d-flex align-items-center">
+          <canvas id="pie" style="width:100%; height:100%"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Despesas por Categoria (barras) -->
+<div class="card shadow-soft mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">Despesas por categoria — {{ month_name }} / {{ year }}</h5>
+      <small class="text-muted">Ordenado do maior para o menor</small>
+    </div>
+    <div style="height: {{ bar_labels|length|add:'2' }}0px; min-height: 220px;">
+      <canvas id="bar-expenses"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Tabela de últimas transações -->
+<div class="card shadow-soft">
+  <div class="card-body">
+    <h5 class="mb-3">Últimas transações</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Conta</th>
+                <th>Categoria</th>
+                <th>Status</th>
+                <th class="text-end">Valor</th>
+                <th class="text-end">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in recent %}
+            <tr>
+                <td>{{ t.date|date:"d/m/Y" }}</td>
+                <td>{{ t.description }}</td>
+                <td><span class="badge badge-account">{{ t.account.name }}</span></td>
+                <td>
+                {% if t.category.kind == "IN" %}
+                    <span class="badge text-bg-success">Receita</span>
+                {% else %}
+                    <span class="badge text-bg-danger">Despesa</span>
+                {% endif %}
+                {{ t.category.name }}
+                </td>
+                <td>
+                {% if t.status == "PAG" %}
+                    <span class="badge text-bg-success">Paga</span>
+                {% else %}
+                    <span class="badge text-bg-warning text-dark">Pendente</span>
+                {% endif %}
+                </td>
+                <td class="text-end">
+                {% if t.amount >= 0 %}
+                    <span class="amount-pos">R$ {{ t.amount|floatformat:2|intcomma }}</span>
+                {% else %}
+                    <span class="amount-neg">R$ {{ t.amount|floatformat:2|intcomma }}</span>
+                {% endif %}
+                </td>
+                <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'edit_transaction' t.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <form method="post" action="{% url 'delete_transaction' t.id %}" style="display:inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Excluir este lançamento?')">
+                    <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+                <form method="post" action="{% url 'toggle_status' t.id %}" style="display:inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-sm btn-outline-success" title="Alternar Paga/Pendente">
+                    <i class="bi bi-check2-circle"></i>
+                    </button>
+                </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted">Sem lançamentos no mês.</td></tr>
+            {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Valores crus do backend, mas deslocalizados para JS (sem vírgulas).
+  const inPaid  = parseFloat('{{ total_in_paid|default:0|unlocalize }}')  || 0;
+  const exPaidA = Math.abs(parseFloat('{{ total_ex_paid|default:0|unlocalize }}')) || 0;
+  const inPrev  = parseFloat('{{ total_in|default:0|unlocalize }}')      || 0;
+  const exPrevA = Math.abs(parseFloat('{{ total_ex|default:0|unlocalize }}')) || 0;
+
+  // Usar pagos se houver; senão, previstos
+  let r = inPaid, d = exPaidA, label = ' (Pagos)';
+  if ((r + d) === 0) { r = inPrev; d = exPrevA; label = ' (Previstos)'; }
+
+  const pieEl   = document.getElementById('pie');
+  const titleEl = document.getElementById('pie-title');
+
+  if (!pieEl) {
+    console.error('Canvas #pie não encontrado');
+  } else if (typeof Chart === 'undefined') {
+    console.error('Chart.js não carregado');
+  } else if ((r + d) === 0) {
+    const card = pieEl.closest('.card-body');
+    if (card) card.innerHTML = '<div class="text-muted">Sem dados para exibir.</div>';
+  } else {
+    if (titleEl) titleEl.innerHTML = 'Receitas vs Despesas <small class="text-muted">'+label+'</small>';
+
+    new Chart(pieEl, {
+      type: 'doughnut',
+      data: {
+        labels: ['Receitas', 'Despesas'],
+        datasets: [{
+          data: [r, d],  // despesas sempre em módulo
+          backgroundColor: ['#2563eb', '#fecaca'],
+          borderColor: ['#1d4ed8', '#fca5a5'],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,  // usa a altura do canvas
+        cutout: '55%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.parsed;
+                const total = r + d;
+                const pct = total ? (val / total * 100) : 0;
+                const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val);
+                return `${ctx.label}: ${brl} (${pct.toFixed(1)}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+</script>
+
+
+{{ bar_labels|json_script:"bar-labels" }}
+{{ bar_values|json_script:"bar-values" }}
+
+<script>
+(function () {
+  const labels = JSON.parse(document.getElementById('bar-labels').textContent || '[]');
+  const values = JSON.parse(document.getElementById('bar-values').textContent || '[]');
+  const el = document.getElementById('bar-expenses');
+  if (!el) return;
+
+  if (!labels.length) {
+    const cardBody = el.closest('.card-body');
+    if (cardBody) cardBody.innerHTML += '<div class="text-muted">Sem despesas neste período.</div>';
+    return;
+  }
+
+  // === paleta dinâmica (light -> dark) ===
+  const LIGHT = { r: 254, g: 226, b: 226 }; // #fee2e2
+  const DARK  = { r: 185, g:  28, b:  28 }; // #b91c1c
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1e-9); // evita divisão por zero
+
+  const toColor = (v) => {
+    const t = (v - min) / span; // 0..1
+    const r = Math.round(LIGHT.r + t * (DARK.r - LIGHT.r));
+    const g = Math.round(LIGHT.g + t * (DARK.g - LIGHT.g));
+    const b = Math.round(LIGHT.b + t * (DARK.b - LIGHT.b));
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  // borda um pouco mais escura que o fundo
+  const darker = (rgb) => {
+    const m = rgb.match(/\d+/g).map(Number);
+    const f = 0.88;
+    return `rgb(${Math.round(m[0]*f)}, ${Math.round(m[1]*f)}, ${Math.round(m[2]*f)})`;
+  };
+
+  const bgColors = values.map(toColor);
+  const bdColors = bgColors.map(darker);
+
+  // plugin para rótulos em R$
+  const valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart) {
+      const {ctx, chartArea} = chart;
+      const meta = chart.getDatasetMeta(0);
+      const data = chart.data.datasets[0].data;
+      ctx.save();
+      ctx.font = getComputedStyle(chart.canvas).font || '12px sans-serif';
+      ctx.textBaseline = 'middle';
+      meta.data.forEach((bar, i) => {
+        const val = data[i] ?? 0;
+        const txt = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val);
+        ctx.fillStyle = '#991b1b'; // rótulo fixo, bom contraste
+        const x = Math.min(bar.x + 8, chartArea.right - 4);
+        ctx.fillText(txt, x, bar.y);
+      });
+      ctx.restore();
+    }
+  };
+
+  new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: bdColors,
+        borderWidth: 1,
+        hoverBackgroundColor: bdColors,
+        hoverBorderColor: '#7f1d1d'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      layout: { padding: { right: 56 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: { display: false, grid: { display: false } },
+        y: { grid: { display: false }, ticks: { color: '#334155' } }
+      }
+    },
+    plugins: [valueLabels]
+  });
+})();
+</script>
+
+
+{% endblock %}
+
+
+

@@ -1,0 +1,160 @@
+:root{
+  /* Plano de fundo + contraste */
+  --bg-top:#e6eef9;         /* azul bem claro */
+  --bg-bottom:#e2e8f0;      /* slate-200 */
+  --card:#ffffff;
+  --border:#c5d0e0;         /* borda mais marcada (blue-gray) */
+  --muted:#475569;          /* slate-600 (mais escuro p/ leitura) */
+  --text:#0f172a;           /* slate-900 */
+  --primary:#2563eb;        /* azul */
+  --green:#059669;
+  --red:#dc2626;
+  --soft-blue:#e8f0ff;
+
+  --shadow-1: 0 6px 16px rgba(2, 6, 23, .12);
+  --shadow-2: 0 12px 28px rgba(2, 6, 23, .16);
+}
+
+/* Fundo com leve gradiente azulado */
+body{
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+/* Navbar “flutuando” do fundo */
+.navbar{
+  background: rgba(255,255,255,.95)!important;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(2,6,23,.08);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- Cards com separação clara ---- */
+.card{
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-1);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.card:hover{ transform: translateY(-2px); box-shadow: var(--shadow-2); border-color:#9fb3d4; }
+
+/* blocos internos (resumo/KPIs) com fundo levemente azulado */
+.border-lite{
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: #f7fafc;
+}
+
+/* KPIs coloridos, mas suaves */
+.amount-pos{ color: var(--green); font-weight: 700; }
+.amount-neg{ color: var(--red);   font-weight: 700; }
+
+.badge-account{
+  background: var(--soft-blue);
+  color: var(--primary);
+  border: 1px solid rgba(37,99,235,.18);
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+/* Tabela com cabeçalho destacado e linhas separadas */
+.table{ color: var(--text); border-color: var(--border); }
+.table thead th{
+  background: #eef2f7;              /* cinza-azulado */
+  color: var(--muted);
+  border-bottom: 1.5px solid var(--border);
+}
+.table tbody tr{ border-color: var(--border); }
+.table tbody tr:hover{ background: #f5f7fb; }
+
+/* Espaçamento entre grandes blocos (dashboard) */
+main.container > .row,
+main.container > .card{ margin-bottom: 1.6rem; }
+
+/* Botões */
+.btn-primary{ background: var(--primary); border-color: var(--primary); }
+.btn-outline-primary{ border-color: var(--primary); color: var(--primary); }
+.btn-outline-primary:hover{ background: var(--primary); color:#fff; }
+
+/* Pequenas melhorias visuais */
+.text-muted{ color: var(--muted)!important; }
+.shadow-soft{ box-shadow: var(--shadow-1); }
+
+/* Responsividade: mantém gráfico e KPIs com a mesma “altura visual” */
+@media (min-width: 992px){
+  .card.h-100{ height: calc(100% - .4rem); }
+}
+
+
+/* menu */
+.navbar .nav-link{
+  font-weight:500;
+  color:#475569;
+  border-radius:8px;
+  padding:.5rem .75rem;
+}
+.navbar .nav-link:hover{
+  background:#f1f5ff;
+  color:#2563eb;
+}
+.navbar .nav-link.active{
+  background:#2563eb;
+  color:#fff!important;
+  box-shadow:0 2px 8px rgba(37,99,235,.25);
+}
+
+
+/* new transaction */
+form .form-control, form .form-select {
+  border-radius: 10px;
+  border: 1.3px solid var(--border);
+  transition: border-color .2s, box-shadow .2s;
+}
+form .form-control:focus, form .form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.15rem rgba(37,99,235,.15);
+}
+form .btn-light {
+  background: #f8fafc;
+  border-color: var(--border);
+}
+
+
+/* inputs mais agradáveis */
+form .form-control, form .form-select {
+  border-radius: 10px;
+  border: 1.3px solid var(--border);
+  transition: border-color .2s, box-shadow .2s;
+}
+form .form-control:focus, form .form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.15rem rgba(37,99,235,.15);
+}
+
+/* botões chips na sidebar */
+.quick-amount, .quick-cat {
+  border-radius: 999px;
+  padding: .35rem .7rem;
+}
+
+
+
+.badge.text-bg-warning { background: #fde68a; color: #92400e; } /* pendente */
+.btn-outline-secondary i, .btn-outline-danger i, .btn-outline-success i { pointer-events: none; }
+
+
+
+/* cartões e inputs mais “aéreos” */
+.shadow-soft { box-shadow: 0 6px 18px rgba(20, 40, 80, .08); border: 1px solid rgba(2, 6, 23, .06); }
+.input-group-text { background: #f7f9fc; }
+.form-text { margin-top: .25rem; }
+
+/* botões rápidos */
+.quick-amount { border-radius: 999px; }
+
+/* título dos cards */
+.card-title i { color: #3b82f6; }
+
+
