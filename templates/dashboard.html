@@ -27,21 +27,45 @@
     <div class="row g-3">
       
       <!-- Total Receitas -->
-      <div class="col-6 col-xl-6">
-        <div class="card border-lite h-100 p-3">
-          <div class="text-muted">Total Receitas</div>
-          <div class="h5 amount-pos mb-0">R$ {{ total_in|floatformat:2|intcomma }}</div>
+        <div class="col-6 col-xl-6">
+            <div class="card border-lite h-100 p-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="text-muted fw-semibold">Receitas</div>
+                <i class="bi bi-cash-stack text-success fs-5"></i>
+                </div>
+                <div class="h5 amount-pos mb-2">R$ {{ total_in|floatformat:2|intcomma }}</div>
+
+                <div class="d-flex justify-content-between small">
+                <span class="text-muted">Pagas:</span>
+                <span class="text-success fw-semibold">R$ {{ total_in_paid|floatformat:2|intcomma }}</span>
+                </div>
+                <div class="d-flex justify-content-between small">
+                <span class="text-muted">Pendentes:</span>
+                <span class="text-warning fw-semibold">R$ {{ total_in_pending|floatformat:2|intcomma }}</span>
+                </div>
+            </div>
         </div>
-      </div>
       <!-- ############ -->
       
       <!-- Total Despesas -->
-      <div class="col-6 col-xl-6">
-        <div class="card border-lite h-100 p-3">
-          <div class="text-muted">Total Despesas</div>
-          <div class="h5 amount-neg mb-0">R$ {{ total_ex|floatformat:2|intcomma }}</div>
+        <div class="col-6 col-xl-6">
+            <div class="card border-lite h-100 p-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="text-muted fw-semibold">Despesas</div>
+                <i class="bi bi-credit-card-2-front text-danger fs-5"></i>
+                </div>
+                <div class="h5 amount-neg mb-2">R$ {{ total_ex|floatformat:2|intcomma }}</div>
+
+                <div class="d-flex justify-content-between small">
+                <span class="text-muted">Pagas:</span>
+                <span class="text-danger fw-semibold">R$ {{ total_ex_paid|floatformat:2|intcomma }}</span>
+                </div>
+                <div class="d-flex justify-content-between small">
+                <span class="text-muted">Pendentes:</span>
+                <span class="text-warning fw-semibold">R$ {{ total_ex_pending|floatformat:2|intcomma }}</span>
+                </div>
+            </div>
         </div>
-      </div>
       <!-- ############ -->
       
       <!-- Saldo Geral -->

@@ -1,6 +1,7 @@
 import calendar
-from datetime import timedelta
-from decimal import Decimal
+import uuid
+from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_DOWN
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,21 +11,14 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 
+from dateutil.relativedelta import relativedelta
+
 from .models import (
     Transaction,
     Category,
     Account,
-    TransactionStatus,  # enum PENDENTE/PAGA
+    TransactionStatus,  # enum PENDING/PAG (PENDENTE/PAGA)
 )
-
-from dateutil.relativedelta import relativedelta
-from decimal import Decimal, ROUND_DOWN
-
-import uuid
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from decimal import Decimal, ROUND_DOWN
-
 
 # --------------------------------------------
 # Helpers
@@ -47,48 +41,51 @@ MONTHS = list(range(1, 13))
 def dashboard(request):
     year, month = _period_from_request(request)
 
-    qs = Transaction.objects.filter(
-        date__year=year,
-        date__month=month,
-        account__owner=request.user,
-    ).select_related("account", "category")
+    qs = (
+        Transaction.objects
+        .filter(date__year=year, date__month=month, account__owner=request.user)
+        .select_related("account", "category")
+    )
 
+    # Totais gerais do mês (por tipo via categoria)
     totals = qs.values("category__kind").annotate(total=Sum("amount"))
     total_in = sum(t["total"] for t in totals if t["category__kind"] == "IN") or Decimal("0")
     total_ex = sum(t["total"] for t in totals if t["category__kind"] == "EX") or Decimal("0")
     total_ex_abs = abs(total_ex)
     net = total_in + total_ex
 
-    # --- Despesas por categoria (mês/ano) ---
+    # --- Despesas por categoria (mês/ano) -> para o gráfico de barras ---
     ex_by_cat_qs = (
         qs.filter(category__kind="EX")
-        .values("category__name")
-        .annotate(total=Sum("amount"))
+          .values("category__name")
+          .annotate(total=Sum("amount"))
     )
-
-    # transforma em lista, pega módulo (positivo) e ordena desc
     ex_by_cat = []
     for r in ex_by_cat_qs:
-        if r["total"]:  # só categorias com algum valor
+        if r["total"]:
             ex_by_cat.append({
                 "name": r["category__name"],
                 "total": abs(r["total"] or Decimal("0")),
             })
-
     ex_by_cat.sort(key=lambda x: x["total"], reverse=True)
-
     bar_labels = [x["name"] for x in ex_by_cat]
     bar_values = [float(x["total"]) for x in ex_by_cat]
 
+    # --- Pagos (PAGO) do mês ---
     qs_paid = qs.filter(status=TransactionStatus.PAID)
-
     totals_paid = qs_paid.values("category__kind").annotate(total=Sum("amount"))
     total_in_paid = sum(t["total"] for t in totals_paid if t["category__kind"] == "IN") or Decimal("0")
     total_ex_paid = sum(t["total"] for t in totals_paid if t["category__kind"] == "EX") or Decimal("0")
+    total_ex_paid_abs = abs(total_ex_paid)
     net_paid = total_in_paid + total_ex_paid  # saldo parcial (apenas pagos)
 
-    total_ex_paid_abs = abs(total_ex_paid)
+    # --- Pendentes (PENDENTE) do mês ---
+    qs_pending = qs.filter(status=TransactionStatus.PENDING)
+    totals_pending = qs_pending.values("category__kind").annotate(total=Sum("amount"))
+    total_in_pending = sum(t["total"] for t in totals_pending if t["category__kind"] == "IN") or Decimal("0")
+    total_ex_pending = sum(t["total"] for t in totals_pending if t["category__kind"] == "EX") or Decimal("0")
 
+    # Saldos por conta (geral, não filtrado por mês) — como você já tinha
     accounts = Account.objects.filter(owner=request.user)
     account_balances = []
     for acc in accounts:
@@ -100,21 +97,26 @@ def dashboard(request):
         "month": month,
         "year": year,
         "month_name": calendar.month_name[month],
+
+        # Totais gerais do mês
         "total_in": total_in,
         "total_ex": total_ex,
         "total_ex_abs": total_ex_abs,
         "net": net,
 
-        # >>> NOVOS <<<
+        # Totais pagos / pendentes (mês)
         "total_in_paid": total_in_paid,
         "total_ex_paid": total_ex_paid,
         "total_ex_paid_abs": total_ex_paid_abs,
         "net_paid": net_paid,
-        # -------------
+        "total_in_pending": total_in_pending,
+        "total_ex_pending": total_ex_pending,
 
+        # Lista e contas
         "recent": qs.order_by("-date", "-id")[:10],
         "account_balances": account_balances,
 
+        # Dados do gráfico de barras de despesas por categoria
         "bar_labels": bar_labels,
         "bar_values": bar_values,
     }
@@ -142,6 +144,7 @@ def new_transaction(request):
             cat = Category.objects.get(id=request.POST["category"])
 
             amt = Decimal(str(request.POST["amount"]))
+            # Se for despesa e o valor veio positivo, torna negativo
             if cat.kind == "EX" and amt > 0:
                 amt = -amt
 
@@ -152,9 +155,7 @@ def new_transaction(request):
             # Parcelas
             installments = int(request.POST.get("installments") or 1)
             first_due = (request.POST.get("first_due") or request.POST["date"]).strip()
-
-            # input type=date envia ISO (YYYY-MM-DD)
-            start_date = datetime.fromisoformat(first_due).date()
+            start_date = datetime.fromisoformat(first_due).date()  # input type=date (YYYY-MM-DD)
 
             if installments <= 1:
                 Transaction.objects.create(
@@ -179,7 +180,6 @@ def new_transaction(request):
 
                 for i in range(n):
                     part = base
-                    # distribui o centavo que sobrou/faltou
                     if diff != 0:
                         step = Decimal("0.01") if diff > 0 else Decimal("-0.01")
                         part = base + step
@@ -206,7 +206,6 @@ def new_transaction(request):
         except Exception as e:
             messages.error(request, f"Erro ao salvar transação: {e}")
 
-
     # categorias mais usadas pelo usuário nos últimos 60 dias (para sidebar)
     cutoff = now().date() - timedelta(days=60)
     recent_qs = (
@@ -227,7 +226,7 @@ def new_transaction(request):
         "recent_categories": recent_cats,
         "quick_amounts": [20, 50, 100, 150, 200, 350],
         "status_choices": TransactionStatus.choices,
-        "installment_options": [1,2,3,4,5,6,7,8,9,10,11,12,18,24],   # <<< AQUI
+        "installment_options": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24],
     }
     return render(request, "new_transaction.html", ctx)
 
@@ -300,11 +299,13 @@ def toggle_status(request, pk):
 def receipts_view(request):
     year, month = _period_from_request(request)
     sections = Category.objects.filter(kind="IN").order_by("name")
-    tx = Transaction.objects.filter(
-        date__year=year, date__month=month, account__owner=request.user
-    ).select_related("category", "account")
+    tx = (
+        Transaction.objects
+        .filter(date__year=year, date__month=month, account__owner=request.user)
+        .select_related("category", "account")
+    )
 
-    # ATENÇÃO: usar 'txs' (e não 'items') para evitar conflito com dict.items no template
+    # usar 'txs' (não 'items') no template
     by_cat = {c.id: {"category": c, "txs": [], "total": Decimal("0")} for c in sections}
     for t in tx.filter(category__kind="IN"):
         b = by_cat.get(t.category_id)
@@ -325,9 +326,11 @@ def receipts_view(request):
 def expenses_view(request):
     year, month = _period_from_request(request)
     sections = Category.objects.filter(kind="EX").order_by("name")
-    tx = Transaction.objects.filter(
-        date__year=year, date__month=month, account__owner=request.user
-    ).select_related("category", "account")
+    tx = (
+        Transaction.objects
+        .filter(date__year=year, date__month=month, account__owner=request.user)
+        .select_related("category", "account")
+    )
 
     by_cat = {c.id: {"category": c, "txs": [], "total": Decimal("0")} for c in sections}
     for t in tx.filter(category__kind="EX"):
