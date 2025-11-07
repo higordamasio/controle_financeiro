@@ -91,6 +91,20 @@
               <div class="text-muted" id="parcel-preview">—</div>
             </div>
 
+            <!-- NOVO: Checkbox de Despesa/Receita fixa -->
+            <div class="col-md-4 d-flex align-items-center">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="id_is_fixed" name="is_fixed"
+                       {% if preset.is_fixed %}checked{% endif %}>
+                <label class="form-check-label" for="id_is_fixed">
+                  Despesa/Receita fixa
+                </label>
+                <div class="form-text">
+                  Para lançamentos recorrentes <b>sem parcelamento</b>.
+                </div>
+              </div>
+            </div>
+
             <!-- Ações -->
             <div class="col-12 d-flex justify-content-between pt-2">
               <a href="{{ preset.next|default:'/' }}" class="btn btn-outline-secondary">← Voltar</a>
@@ -136,7 +150,7 @@
 
           <div class="d-grid gap-2">
             <a class="btn btn-outline-success"
-               href="?category=&desc=Receita%20Fixa&next={{ request.get_full_path|urlencode }}">+ Receita Fixa (exemplo)</a>
+               href="?category=&desc=Receita%20Fixa&fixed=1&next={{ request.get_full_path|urlencode }}">+ Receita Fixa (exemplo)</a>
             <a class="btn btn-outline-dark" href="/admin/core/category/add/">+ Nova Categoria (admin)</a>
           </div>
 
@@ -158,6 +172,7 @@
   const amount = document.querySelector('input[name="amount"]');
   const inst   = document.getElementById('installments');
   const prev   = document.getElementById('parcel-preview');
+  const fixed  = document.getElementById('id_is_fixed');
   const brl = (v) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
 
   function updatePreview() {
@@ -167,9 +182,19 @@
     const unit = Math.abs(v / n);
     prev.innerHTML = `<span class="text-muted">Ficará</span> <b>${n}x</b> de <b>${brl(unit)}</b>`;
   }
+
+  function syncFixed() {
+    const n = parseInt(inst?.value || '1', 10);
+    const disable = n > 1;
+    if (!fixed) return;
+    fixed.disabled = disable;
+    if (disable) fixed.checked = false;
+  }
+
   amount?.addEventListener('input', updatePreview);
-  inst?.addEventListener('change', updatePreview);
+  inst?.addEventListener('change', () => { updatePreview(); syncFixed(); });
   updatePreview();
+  syncFixed();
 
   // botões de valor rápido
   document.querySelectorAll('.quick-amount').forEach(btn => {
