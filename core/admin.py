@@ -14,7 +14,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ("date", "description", "account", "category", "amount")
-    list_filter = ("account", "category", "date")
+    list_display = ("date", "description", "account", "category", "amount", "status", "is_fixed")
+    list_filter = ("account", "category", "date", "status", "is_fixed")
     search_fields = ("description",)
     date_hierarchy = "date"

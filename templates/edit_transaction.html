@@ -59,6 +59,21 @@
       </select>
     </div>
 
+    <div class="col-md-6">
+      <div class="form-check mt-4">
+        {% if tx.installment_count|default:0 > 1 %}
+          <input class="form-check-input" type="checkbox" id="id_is_fixed" name="is_fixed" disabled>
+          <label class="form-check-label" for="id_is_fixed">Despesa/Receita fixa</label>
+          <div class="form-text">Lançamentos de <b>parcelas</b> não podem ser marcados como fixos.</div>
+        {% else %}
+          <input class="form-check-input" type="checkbox" id="id_is_fixed" name="is_fixed"
+                 {% if tx.is_fixed %}checked{% endif %}>
+          <label class="form-check-label" for="id_is_fixed">Despesa/Receita fixa</label>
+          <div class="form-text">Marque para indicar que é um lançamento recorrente sem parcelas.</div>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="col-12 d-flex justify-content-end mt-3">
       <a href="{{ next }}" class="btn btn-light border me-2">← Voltar</a>
       <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvar alterações</button>

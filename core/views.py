@@ -136,6 +136,8 @@ def new_transaction(request):
         "category_id": request.GET.get("category") or "",
         "amount": request.GET.get("amount") or "",
         "next": request.GET.get("next") or "",
+        # preset opcional via query (?fixed=1)
+        "is_fixed": request.GET.get("fixed") in ("1", "true", "on"),
     }
 
     if request.method == "POST":
@@ -157,6 +159,9 @@ def new_transaction(request):
             first_due = (request.POST.get("first_due") or request.POST["date"]).strip()
             start_date = datetime.fromisoformat(first_due).date()  # input type=date (YYYY-MM-DD)
 
+            # Checkbox (só vale quando NÃO parcelado)
+            is_fixed_flag = ('is_fixed' in request.POST) and (installments <= 1)
+
             if installments <= 1:
                 Transaction.objects.create(
                     date=start_date,
@@ -167,6 +172,7 @@ def new_transaction(request):
                     status=status_val,
                     installment_no=None,
                     installment_count=None,
+                    is_fixed=is_fixed_flag,
                 )
             else:
                 total = amt
@@ -197,6 +203,7 @@ def new_transaction(request):
                         group_id=group,
                         installment_no=i + 1,
                         installment_count=n,
+                        is_fixed=False,  # parcelas nunca são "fixas"
                     )
 
             messages.success(request, f"Lançamento salvo{'s' if installments>1 else ''}! ✅")
@@ -242,7 +249,16 @@ def edit_transaction(request, pk):
         try:
             acc = Account.objects.get(id=request.POST["account"], owner=request.user)
             cat = Category.objects.get(id=request.POST["category"])
-            amt = Decimal(str(request.POST["amount"]))
+
+            # Amount: trata vazio/virgula e entradas inválidas
+            raw_amount = (request.POST.get("amount") or "").replace(",", ".").strip()
+            try:
+                amt = Decimal(raw_amount)
+            except (InvalidOperation, ValueError):
+                messages.error(request, "Valor inválido. Use número com ponto ou vírgula.")
+                return redirect(request.POST.get("next") or reverse("dashboard"))
+
+            # Se for despesa e o valor veio positivo, torna negativo
             if cat.kind == "EX" and amt > 0:
                 amt = -amt
 
@@ -250,15 +266,25 @@ def edit_transaction(request, pk):
             if status_val not in dict(TransactionStatus.choices):
                 status_val = TransactionStatus.PENDING
 
-            tx.date = request.POST["date"]
+            tx.date = request.POST["date"]  # YYYY-MM-DD (ok para DateField)
             tx.description = request.POST["description"].strip()
             tx.account = acc
             tx.category = cat
             tx.amount = amt
             tx.status = status_val
+
+            # >>> CORREÇÃO AQUI: identificar parcelamento sem usar group_id <<<
+            # - Parcelado se tiver installment_count > 1 OU installment_no definido.
+            is_parceled = (tx.installment_count or 0) > 1 or (tx.installment_no is not None)
+            if is_parceled:
+                tx.is_fixed = False
+            else:
+                tx.is_fixed = ('is_fixed' in request.POST)
+
             tx.save()
             messages.success(request, "Transação atualizada! ✅")
             return redirect(request.POST.get("next") or reverse("dashboard"))
+
         except Exception as e:
             messages.error(request, f"Erro ao atualizar: {e}")
 
@@ -270,6 +296,7 @@ def edit_transaction(request, pk):
         "next": request.GET.get("next") or request.META.get("HTTP_REFERER") or reverse("dashboard"),
     }
     return render(request, "edit_transaction.html", ctx)
+
 
 @login_required
 @require_POST
