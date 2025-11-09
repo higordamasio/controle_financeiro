@@ -5,7 +5,7 @@ from core.views import (
     dashboard, new_transaction,
     receipts_view, expenses_view, add_section,
     edit_transaction, delete_transaction, toggle_status,
-    transactions_view,
+    transactions_view, import_fixed
 )
 
 urlpatterns = [
@@ -19,4 +19,5 @@ urlpatterns = [
     path("despesas/", expenses_view, name="expenses"),
     path("secao/add/", add_section, name="add_section"),
     path("transacoes/", transactions_view, name="transactions"),
+    path("fixas/importar/<str:kind>/", import_fixed, name="import_fixed"),
 ]
