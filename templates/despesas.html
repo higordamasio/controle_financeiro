@@ -85,7 +85,12 @@
               {% for t in sec.txs %}
                 <tr>
                   <td>{{ t.date|date:"d/m/Y" }}</td>
-                  <td>{{ t.description }}</td>
+                  <td>
+                    {{ t.description }}
+                    {% if t.is_fixed %}
+                        <span class="badge text-bg-info ms-1">Fixa</span>
+                    {% endif %}
+                  </td>
                   <td><span class="badge badge-account">{{ t.account.name }}</span></td>
                   <td>
                     {% if t.status == "PAG" %}
