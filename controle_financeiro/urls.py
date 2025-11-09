@@ -4,7 +4,8 @@ from django.urls import path
 from core.views import (
     dashboard, new_transaction,
     receipts_view, expenses_view, add_section,
-    edit_transaction, delete_transaction, toggle_status
+    edit_transaction, delete_transaction, toggle_status,
+    transactions_view,
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path("receitas/", receipts_view, name="receipts"),
     path("despesas/", expenses_view, name="expenses"),
     path("secao/add/", add_section, name="add_section"),
+    path("transacoes/", transactions_view, name="transactions"),
 ]

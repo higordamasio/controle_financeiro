@@ -4,6 +4,11 @@
 {% block title %}Receitas — FinCtrl{% endblock %}
 
 {% block content %}
+<style>
+  .rotate-icon { transition: transform 0.25s ease; }
+  .rotate-icon.rotated { transform: rotate(90deg); }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h3 class="mb-0 d-flex align-items-center gap-2">
     <i class="bi bi-graph-up text-success"></i> Receitas
@@ -11,7 +16,7 @@
 
   <div class="d-flex align-items-center gap-2 flex-wrap">
 
-    <!-- Menu de ações -->
+    <!-- Ações -->
     <div class="dropdown">
       <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown">
         <i class="bi bi-list"></i> Ações
@@ -35,7 +40,7 @@
         {% endfor %}
       </select>
       <input type="number" name="year" class="form-control form-control-sm" style="width: 90px" value="{{ year }}">
-      <button class="btn btn-outline-primary btn-sm">Filtrar</button>
+      <button class="btn btn-outline-primary btn-sm">Ir</button>
       <span class="badge text-bg-light">Mês: {{ month|stringformat:"02d" }}/{{ year }}</span>
     </form>
   </div>
@@ -43,15 +48,15 @@
 
 {% for sec in sections %}
   <div class="card shadow-soft mb-3">
-    <!-- Cabeçalho -->
     <div class="card-header bg-white border-0 py-2">
       <div class="d-flex justify-content-between align-items-center">
-        <button class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#cat-{{ sec.category.id }}"
-                aria-expanded="false"
-                aria-controls="cat-{{ sec.category.id }}">
+        <button
+          type="button"
+          class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 collapse-toggle"
+          data-collapse-target="#cat-{{ sec.category.id }}"
+          aria-controls="cat-{{ sec.category.id }}"
+          aria-expanded="false">
+          <i class="bi bi-chevron-right rotate-icon"></i>
           <i class="bi bi-folder2-open text-success"></i>
           <span class="fw-semibold">{{ sec.category.name }}</span>
           <span class="badge text-bg-secondary">{{ sec.txs|length }} itens</span>
@@ -63,7 +68,7 @@
       </div>
     </div>
 
-    <!-- Corpo -->
+    <!-- FECHADO por padrão -->
     <div id="cat-{{ sec.category.id }}" class="collapse">
       <div class="card-body pt-0">
         {% if sec.txs %}
@@ -90,6 +95,9 @@
                       <span class="badge text-bg-success">Paga</span>
                     {% else %}
                       <span class="badge text-bg-warning text-dark">Pendente</span>
+                    {% endif %}
+                    {% if t.installment_no %}
+                      <span class="badge text-bg-light ms-1">{{ t.installment_no }}/{{ t.installment_count }}</span>
                     {% endif %}
                   </td>
                   <td class="text-end text-success">R$ {{ t.amount|floatformat:2|intcomma }}</td>
@@ -128,36 +136,90 @@
 {% empty %}
   <div class="alert alert-info">Nenhuma seção de receitas. Use “+ Add Seção”.</div>
 {% endfor %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  if (window.location.hash) {
-    const el = document.querySelector(window.location.hash);
-    if (el && el.classList.contains('collapse')) {
-      const c = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
-      c.show();
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
-
-  function setAll(open) {
-    document.querySelectorAll('.collapse[id^="cat-"]').forEach(el => {
-      const c = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
-      open ? c.show() : c.hide();
+  // Helper: sincroniza aria/ícone de TODOS os botões que apontam para um collapse
+  function syncButtonsFor(el, isOpen){
+    const sel = '#' + el.id;
+    document.querySelectorAll(`.collapse-toggle[data-collapse-target="${sel}"]`).forEach(btn=>{
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      const icon = btn.querySelector('.rotate-icon');
+      if (icon) icon.classList.toggle('rotated', isOpen);
     });
   }
 
-  document.body.addEventListener('click', (ev) => {
+  // Toggle manual robusto (sem depender de data-bs-toggle)
+  function toggleCollapse(sel){
+    const el = document.querySelector(sel);
+    if(!el) return;
+    if (window.bootstrap && bootstrap.Collapse){
+      const inst = bootstrap.Collapse.getOrCreateInstance(el, {toggle:false});
+      if (el.classList.contains('show')) inst.hide(); else inst.show();
+    } else {
+      el.classList.toggle('show');
+      syncButtonsFor(el, el.classList.contains('show'));
+    }
+  }
+
+  // Liga botões individuais
+  document.querySelectorAll('.collapse-toggle').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const sel = btn.getAttribute('data-collapse-target');
+      toggleCollapse(sel);
+    });
+  });
+
+  // Eventos Bootstrap para manter ícone/aria sincronizados mesmo com transições
+  document.querySelectorAll('.collapse').forEach(el=>{
+    el.addEventListener('shown.bs.collapse', ()=> syncButtonsFor(el, true));
+    el.addEventListener('hidden.bs.collapse', ()=> syncButtonsFor(el, false));
+    // Sincroniza estado inicial (se já vier com .show)
+    syncButtonsFor(el, el.classList.contains('show'));
+  });
+
+  // Expandir/Recolher em massa (se existir menu)
+  function setAll(open){
+    document.querySelectorAll('.collapse[id^="cat-"]').forEach(el=>{
+      if (window.bootstrap && bootstrap.Collapse){
+        const inst = bootstrap.Collapse.getOrCreateInstance(el, {toggle:false});
+        open ? inst.show() : inst.hide();
+      } else {
+        el.classList.toggle('show', open);
+        syncButtonsFor(el, open);
+      }
+    });
+  }
+  document.body.addEventListener('click', (ev)=>{
     const btn = ev.target.closest('[data-bulk]');
     if (!btn) return;
-    const action = btn.dataset.bulk;
+    const action = btn.getAttribute('data-bulk');
     if (action === 'expand') setAll(true);
     if (action === 'collapse') setAll(false);
     const menu = btn.closest('.dropdown-menu');
-    if (menu) bootstrap.Dropdown.getOrCreateInstance(menu.previousElementSibling).hide();
+    if (menu && window.bootstrap){
+      const toggle = menu.previousElementSibling;
+      if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+    }
   });
+
+  // Reabre via hash (#algum-id) e sincroniza ícone
+  if (window.location.hash){
+    const el = document.querySelector(window.location.hash);
+    if (el && el.classList.contains('collapse')){
+      if (window.bootstrap && bootstrap.Collapse){
+        bootstrap.Collapse.getOrCreateInstance(el, {toggle:false}).show();
+      } else {
+        el.classList.add('show');
+        syncButtonsFor(el, true);
+      }
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }
 });
 </script>
 {% endblock %}
