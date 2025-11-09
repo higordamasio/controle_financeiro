@@ -43,6 +43,14 @@
       <button class="btn btn-outline-primary btn-sm">Ir</button>
       <span class="badge text-bg-light">Mês: {{ month|stringformat:"02d" }}/{{ year }}</span>
     </form>
+    <form method="post" action="{% url 'import_fixed' 'IN' %}" class="d-flex align-items-center gap-2">
+      {% csrf_token %}
+      <input type="hidden" name="year" value="{{ year }}">
+      <input type="hidden" name="month" value="{{ month }}">
+      <button class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-cloud-download me-1"></i> Importar fixas  
+      </button>
+    </form>
   </div>
 </div>
 

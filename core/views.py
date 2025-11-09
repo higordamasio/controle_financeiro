@@ -1,6 +1,6 @@
 import calendar
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from decimal import Decimal, ROUND_DOWN
 
 from django.contrib import messages
@@ -461,3 +461,94 @@ def transactions_view(request):
         "net_paid": net_paid,
     }
     return render(request, "transacoes.html", context)
+
+
+
+@login_required
+@require_POST
+def import_fixed(request, kind: str):
+    """
+    Importa transações FIXAS do mês anterior para o mês atual (sempre PENDENTE).
+    Sem heurística por título — parcelamento é verificado pelos campos do modelo.
+    kind: 'EX' (despesas) ou 'IN' (receitas).
+    """
+    if kind not in ("EX", "IN"):
+        messages.error(request, "Tipo inválido.")
+        return redirect("dashboard")
+
+    # período alvo vindo do formulário (toolbar da página)
+    try:
+        year = int(request.POST.get("year"))
+        month = int(request.POST.get("month"))
+    except (TypeError, ValueError):
+        today = now().date()
+        year, month = today.year, today.month
+
+    # mês anterior
+    first_curr = date(year, month, 1)
+    first_prev = first_curr - relativedelta(months=1)
+
+    # FIXAS do mês anterior (apenas as que NÃO são parceladas por campo)
+    prev_qs = (
+        Transaction.objects
+        .filter(
+            account__owner=request.user,
+            date__year=first_prev.year,
+            date__month=first_prev.month,
+            category__kind=kind,
+            is_fixed=True,
+            installment_count__isnull=True,   # <<— verificação por campo, não por título
+        )
+        .select_related("account", "category")
+        .order_by("date", "id")
+    )
+
+    created = 0
+    last_day_curr = calendar.monthrange(year, month)[1]
+
+    for t in prev_qs:
+        # mesmo dia (ajustando para meses mais curtos)
+        target_day = min(getattr(t.date, "day", 1), last_day_curr)
+        target_date = date(year, month, target_day)
+
+        # evita duplicar uma importação idêntica no mês alvo
+        exists = Transaction.objects.filter(
+            account__owner=request.user,
+            date=target_date,
+            account=t.account,
+            category=t.category,
+            description=t.description,
+            amount=t.amount,
+            is_fixed=True,
+            installment_count__isnull=True,
+        ).exists()
+        if exists:
+            continue
+
+        # NÃO enviar group_id para permitir o default do model (evita NOT NULL)
+        Transaction.objects.create(
+            date=target_date,
+            description=t.description,       # mantém “(51/360)” se existir — sem heurística
+            account=t.account,
+            category=t.category,
+            amount=t.amount,                 # mantém sinal (despesa negativa)
+            status=TransactionStatus.PENDING,
+            is_fixed=True,
+            installment_no=None,
+            installment_count=None,
+        )
+        created += 1
+
+    if created:
+        messages.success(
+            request,
+            f"{'Despesas' if kind=='EX' else 'Receitas'} fixas importadas com sucesso ({created}). ✅"
+        )
+    else:
+        messages.info(
+            request,
+            f"Não havia {'despesas' if kind=='EX' else 'receitas'} fixas para importar do mês anterior."
+        )
+
+    target_view = "expenses" if kind == "EX" else "receipts"
+    return redirect(f"{reverse(target_view)}?year={year}&month={month}")
