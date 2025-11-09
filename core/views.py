@@ -117,6 +117,7 @@ def dashboard(request):
         "account_balances": account_balances,
 
         # Dados do gráfico de barras de despesas por categoria
+        "ex_by_cat": ex_by_cat,
         "bar_labels": bar_labels,
         "bar_values": bar_values,
     }
@@ -398,3 +399,65 @@ def add_section(request):
     Category.objects.get_or_create(name=name, kind=kind)
     messages.success(request, "Seção criada com sucesso!")
     return redirect("receipts" if kind == "IN" else "expenses")
+
+
+@login_required
+def transactions_view(request):
+    year, month = _period_from_request(request)
+    q = (request.GET.get("q") or "").strip()
+    selected_status = request.GET.get("status") or ""
+    selected_account = None
+    try:
+        selected_account = int(request.GET.get("account")) if request.GET.get("account") else None
+    except ValueError:
+        selected_account = None
+
+    qs = (
+        Transaction.objects
+        .filter(date__year=year, date__month=month, account__owner=request.user)
+        .select_related("account", "category")
+        .order_by("-date", "-id")
+    )
+
+    if selected_account:
+        qs = qs.filter(account_id=selected_account)
+    if selected_status in dict(TransactionStatus.choices):
+        qs = qs.filter(status=selected_status)
+    if q:
+        qs = qs.filter(description__icontains=q)
+
+    # Totais para os cards
+    totals = qs.values("category__kind").annotate(total=Sum("amount"))
+    total_in = sum(t["total"] for t in totals if t["category__kind"] == "IN") or Decimal("0")
+    total_ex = sum(t["total"] for t in totals if t["category__kind"] == "EX") or Decimal("0")
+    total_ex_abs = abs(total_ex)
+    net = total_in + total_ex
+
+    qs_paid = qs.filter(status=TransactionStatus.PAID)
+    totals_paid = qs_paid.values("category__kind").annotate(total=Sum("amount"))
+    total_in_paid = sum(t["total"] for t in totals_paid if t["category__kind"] == "IN") or Decimal("0")
+    total_ex_paid = sum(t["total"] for t in totals_paid if t["category__kind"] == "EX") or Decimal("0")
+    total_ex_paid_abs = abs(total_ex_paid)
+    net_paid = total_in_paid + total_ex_paid
+
+    context = {
+        "months": MONTHS,
+        "month": month,
+        "year": year,
+        "accounts": Account.objects.filter(owner=request.user),
+        "status_choices": TransactionStatus.choices,
+        "selected_account": selected_account,
+        "selected_status": selected_status,
+        "q": q,
+
+        "txs": qs,
+        "tx_count": qs.count(),
+
+        "total_in": total_in,
+        "total_ex_abs": total_ex_abs,
+        "net": net,
+        "total_in_paid": total_in_paid,
+        "total_ex_paid_abs": total_ex_paid_abs,
+        "net_paid": net_paid,
+    }
+    return render(request, "transacoes.html", context)

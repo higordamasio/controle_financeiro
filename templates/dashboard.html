@@ -1,381 +1,351 @@
 {% extends "base.html" %}
 {% load humanize %}
-{% load l10n %}
 
-{% block title %}Dashboard — FinControl{% endblock %}
+{% block title %}Dashboard — FinCtrl{% endblock %}
 
 {% block content %}
+<style>
+  /* rotação do ícone */
+  .rotate-icon{display:inline-block;transition:transform .2s ease}
+  .rotate-icon.rotated{transform:rotate(90deg)}
 
-<!-- Topo com filtros (Ano/Mês) -->
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">Dashboard - {{ month_name }} / {{ year }}</h3>
-  <form class="d-flex gap-2" method="get">
-    <select class="form-select" name="month" style="width:130px">
-      {% for m in months %}
-        <option value="{{ m }}" {% if month == m %}selected{% endif %}>Mês {{ m }}</option>
-      {% endfor %}
-    </select>
-    <input class="form-control" type="number" name="year" value="{{ year }}" style="width:120px">
-    <button class="btn btn-outline-primary">Filtros</button>
-  </form>
+  /* pílula de seta (idêntica à das listas) */
+  .chev-pill{
+    width: 36px; height: 36px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 10px;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px #e5e7eb;   /* borda suave */
+    cursor: pointer;
+  }
+  .chev-pill:hover{ box-shadow: inset 0 0 0 1px #cbd5e1; background:#f8fafc }
+
+  /* versão com acento "amarelinho" como no screenshot */
+  .chev-pill.chev-accent{
+    background: #fff7ed;                         /* laranja muito claro */
+    box-shadow: inset 0 0 0 1px #fbbf24;         /* amarelo */
+  }
+  .chev-pill.chev-accent .rotate-icon{ color:#f59e0b } /* ícone âmbar */
+</style>
+
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h3 class="mb-0 d-flex align-items-center gap-2">
+    <i class="bi bi-speedometer2 text-primary"></i> Dashboard
+  </h3>
+
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <form action="" method="get" class="d-flex align-items-center gap-2">
+      <select name="month" class="form-select form-select-sm">
+        {% for m in months %}
+          <option value="{{ m }}" {% if m == month %}selected{% endif %}>Mês {{ m|stringformat:"02d" }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="year" class="form-control form-control-sm" style="width: 90px" value="{{ year }}">
+      <button class="btn btn-outline-primary btn-sm">Filtrar</button>
+      <span class="badge text-bg-light">Mês: {{ month|stringformat:"02d" }}/{{ year }}</span>
+    </form>
+  </div>
 </div>
 
-<!-- Linha: KPIs (à esquerda) + Gráfico (à direita) -->
-<div class="row g-3 mb-3 align-items-stretch">
-  <!-- KPIs -->
-  <div class="col-12 col-lg-8">
-    <div class="row g-3">
-      
-      <!-- Total Receitas -->
-        <div class="col-6 col-xl-6">
-            <div class="card border-lite h-100 p-3">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                <div class="text-muted fw-semibold">Receitas</div>
-                <i class="bi bi-cash-stack text-success fs-5"></i>
-                </div>
-                <div class="h5 amount-pos mb-2">R$ {{ total_in|floatformat:2|intcomma }}</div>
-
-                <div class="d-flex justify-content-between small">
-                <span class="text-muted">Pagas:</span>
-                <span class="text-success fw-semibold">R$ {{ total_in_paid|floatformat:2|intcomma }}</span>
-                </div>
-                <div class="d-flex justify-content-between small">
-                <span class="text-muted">Pendentes:</span>
-                <span class="text-warning fw-semibold">R$ {{ total_in_pending|floatformat:2|intcomma }}</span>
-                </div>
-            </div>
-        </div>
-      <!-- ############ -->
-      
-      <!-- Total Despesas -->
-        <div class="col-6 col-xl-6">
-            <div class="card border-lite h-100 p-3">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                <div class="text-muted fw-semibold">Despesas</div>
-                <i class="bi bi-credit-card-2-front text-danger fs-5"></i>
-                </div>
-                <div class="h5 amount-neg mb-2">R$ {{ total_ex|floatformat:2|intcomma }}</div>
-
-                <div class="d-flex justify-content-between small">
-                <span class="text-muted">Pagas:</span>
-                <span class="text-danger fw-semibold">R$ {{ total_ex_paid|floatformat:2|intcomma }}</span>
-                </div>
-                <div class="d-flex justify-content-between small">
-                <span class="text-muted">Pendentes:</span>
-                <span class="text-warning fw-semibold">R$ {{ total_ex_pending|floatformat:2|intcomma }}</span>
-                </div>
-            </div>
-        </div>
-      <!-- ############ -->
-      
-      <!-- Saldo Geral -->
-      <div class="col-6 col-xl-6">
-        <div class="card border-lite h-100 p-3">
-          <div class="text-muted">Saldo Geral</div>
-          <div class="h5 {% if net >= 0 %}amount-pos{% else %}amount-neg{% endif %} mb-0">
-            R$ {{ net|floatformat:2|intcomma }}
+<!-- Cards de totais -->
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-4">
+    <div class="card shadow-soft border-0">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-arrow-down-circle text-success fs-4"></i>
+          <div>
+            <div class="text-muted small">Receitas</div>
+            <div class="fs-5 fw-semibold text-success">R$ {{ total_in|floatformat:2|intcomma }}</div>
           </div>
         </div>
-      </div>
-      <!-- ############ -->
-
-      <!-- Saldo Parcial -->
-      <div class="col-6 col-xl-6">
-        <div class="card border-lite h-100 p-3">
-          <div class="text-muted">Saldo Parcial (PAGO)</div>
-           <div class="h5 {% if net_paid >= 0 %}amount-pos{% else %}amount-neg{% endif %} mb-0">
-              R$ {{ net_paid|floatformat:2|intcomma }}
-           </div>
-           <!-- <small class="text-muted">Receitas pagas − Despesas pagas</small> -->
-        </div>
-      </div>
-      <!-- ############ -->
-
-      <!-- Receita Rest. -->
-      <div class="col-6 col-xl-6">
-        <div class="card border-lite h-100 p-3">
-          <div class="text-muted">% Receita Rest.</div>
-          {% if total_in %}
-            {% widthratio net total_in 100 as perc %}
-            <div class="h5 mb-0">{{ perc }}%</div>
-          {% else %}
-            <div class="h5 text-muted mb-0">–</div>
-          {% endif %}
-        </div>
-      </div>
-      <!-- ############ -->
-      
-      <!-- Gasto Diário Sug. -->
-      <div class="col-6 col-xl-6">
-        <div class="card border-lite h-100 p-3">
-          <div class="text-muted">Gasto Diário Sug.</div>
-          {% widthratio total_ex_abs 30 1 as daily %}
-          <div class="h5 amount-neg mb-0">R$ {{ daily|intcomma }}</div>
-          <!-- <small class="text-muted">aprox. (despesas/30)</small> -->
-        </div>
-      </div>
-      <!-- ############ -->
-
-    </div>
-  </div>
-
-  <!-- Gráfico -->
-  <div class="col-12 col-lg-4">
-    <div class="card shadow-soft h-100">
-      <div class="card-body d-flex flex-column">
-        <h5 class="mb-2" id="pie-title">Receitas vs Despesas</h5>
-        <div class="flex-grow-1 d-flex align-items-center">
-          <canvas id="pie" style="width:100%; height:100%"></canvas>
-        </div>
+        <span class="badge text-bg-success">Pagas: R$ {{ total_in_paid|floatformat:2|intcomma }}</span>
       </div>
     </div>
   </div>
 
-<!-- Despesas por Categoria (barras) -->
-<div class="card shadow-soft mb-3">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="mb-0">Despesas por categoria — {{ month_name }} / {{ year }}</h5>
-      <small class="text-muted">Ordenado do maior para o menor</small>
+  <div class="col-12 col-md-4">
+    <div class="card shadow-soft border-0">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-arrow-up-circle text-danger fs-4"></i>
+          <div>
+            <div class="text-muted small">Despesas</div>
+            <div class="fs-5 fw-semibold text-danger">R$ {{ total_ex_abs|floatformat:2|intcomma }}</div>
+          </div>
+        </div>
+        <span class="badge text-bg-danger">Pagas: R$ {{ total_ex_paid_abs|floatformat:2|intcomma }}</span>
+      </div>
     </div>
-    <div style="height: {{ bar_labels|length|add:'2' }}0px; min-height: 220px;">
-      <canvas id="bar-expenses"></canvas>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card shadow-soft border-0">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-cash-coin text-primary fs-4"></i>
+          <div>
+            <div class="text-muted small">Saldo (mês)</div>
+            <div class="fs-5 fw-semibold {% if net >= 0 %}text-success{% else %}text-danger{% endif %}">
+              R$ {{ net|floatformat:2|intcomma }}
+            </div>
+          </div>
+        </div>
+        <span class="badge text-bg-secondary">Pagas: R$ {{ net_paid|floatformat:2|intcomma }}</span>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Tabela de últimas transações -->
-<div class="card shadow-soft">
-  <div class="card-body">
-    <h5 class="mb-3">Últimas transações</h5>
-    <div class="table-responsive">
-      <table class="table table-sm align-middle">
-        <thead>
+<!-- Saldos por conta -->
+<div class="card shadow-soft border-0 mb-3">
+  <div class="card-header bg-white border-0 py-2">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-bank text-primary"></i>
+        <span class="fw-semibold">Saldos por conta</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body pt-0">
+    <div class="d-flex flex-wrap gap-2">
+      {% for ab in account_balances %}
+        <span class="badge bg-white border text-dark px-3 py-2 rounded-pill">
+          <i class="bi bi-wallet2 me-1 text-muted"></i>
+          {{ ab.account.name }}:
+          <strong class="{% if ab.balance >= 0 %}text-success{% else %}text-danger{% endif %} ms-1">
+            R$ {{ ab.balance|floatformat:2|intcomma }}
+          </strong>
+        </span>
+      {% empty %}
+        <span class="text-muted">Sem contas.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Despesas por categoria -->
+<div class="card shadow-soft border-0 mb-3">
+  <div class="card-header bg-white border-0 py-2">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2 collapse-toggle"
+            data-collapse-target="#dash-categorias"
+            aria-controls="dash-categorias"
+            aria-expanded="true"
+            role="button"
+            style="cursor:pointer;">
+        <i class="bi bi-chevron-right rotate-icon rotated"></i>
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-bar-chart-line-fill text-danger"></i>
+            <span class="fw-semibold">Despesas por categoria</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- aberto por padrão -->
+  <div id="dash-categorias" class="collapse show">
+    <div class="card-body pt-0">
+      {% if ex_by_cat %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width:60%">Categoria</th>
+                <th class="text-end" style="width:40%">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in ex_by_cat %}
+                {% if forloop.counter <= 10 %}
+                  <tr>
+                    <td class="d-flex align-items-center gap-2">
+                      <i class="bi bi-folder2 text-danger opacity-75"></i>
+                      <span>{{ item.name }}</span>
+                    </td>
+                    <td class="text-end text-danger">
+                      R$ {{ item.total|floatformat:2|intcomma }}
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <span class="text-muted">Sem dados para o mês.</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Lançamentos recentes -->
+<div class="card shadow-soft border-0">
+  <div class="card-header bg-white border-0 py-2">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2 collapse-toggle"
+            data-collapse-target="#dash-recentes"
+            aria-controls="dash-recentes"
+            aria-expanded="true"
+            role="button"
+            style="cursor:pointer;">
+        <i class="bi bi-chevron-right rotate-icon rotated"></i>
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-clock-history text-muted"></i>
+                <span class="fw-semibold">Lançamentos recentes</span>
+            </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- aberto por padrão -->
+  <div id="dash-recentes" class="collapse show">
+    <div class="card-body pt-0">
+      {% if recent %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
             <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Conta</th>
-                <th>Categoria</th>
-                <th>Status</th>
-                <th class="text-end">Valor</th>
-                <th class="text-end">Ações</th>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Conta</th>
+              <th>Categoria</th>
+              <th>Status</th>
+              <th class="text-end">Valor</th>
             </tr>
-        </thead>
-        <tbody>
+          </thead>
+          <tbody>
             {% for t in recent %}
             <tr>
-                <td>{{ t.date|date:"d/m/Y" }}</td>
-                <td>{{ t.description }}</td>
-                <td><span class="badge badge-account">{{ t.account.name }}</span></td>
-                <td>
+              <td>{{ t.date|date:"d/m/Y" }}</td>
+              <td>{{ t.description }}</td>
+              <td><span class="badge badge-account">{{ t.account.name }}</span></td>
+              <td>
                 {% if t.category.kind == "IN" %}
-                    <span class="badge text-bg-success">Receita</span>
+                  <span class="badge text-bg-success">Receita</span>
                 {% else %}
-                    <span class="badge text-bg-danger">Despesa</span>
+                  <span class="badge text-bg-danger">Despesa</span>
                 {% endif %}
-                {{ t.category.name }}
-                </td>
-                <td>
+              </td>
+              <td>
                 {% if t.status == "PAG" %}
-                    <span class="badge text-bg-success">Paga</span>
+                  <span class="badge text-bg-success">Paga</span>
                 {% else %}
-                    <span class="badge text-bg-warning text-dark">Pendente</span>
+                  <span class="badge text-bg-warning text-dark">Pendente</span>
                 {% endif %}
-                </td>
-                <td class="text-end">
-                {% if t.amount >= 0 %}
-                    <span class="amount-pos">R$ {{ t.amount|floatformat:2|intcomma }}</span>
-                {% else %}
-                    <span class="amount-neg">R$ {{ t.amount|floatformat:2|intcomma }}</span>
-                {% endif %}
-                </td>
-                <td class="text-end">
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'edit_transaction' t.id %}?next={{ request.get_full_path|urlencode }}">
-                    <i class="bi bi-pencil"></i>
-                </a>
-                <form method="post" action="{% url 'delete_transaction' t.id %}" style="display:inline">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Excluir este lançamento?')">
-                    <i class="bi bi-trash"></i>
-                    </button>
-                </form>
-                <form method="post" action="{% url 'toggle_status' t.id %}" style="display:inline">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <button type="submit" class="btn btn-sm btn-outline-success" title="Alternar Paga/Pendente">
-                    <i class="bi bi-check2-circle"></i>
-                    </button>
-                </form>
-                </td>
+              </td>
+              <td class="text-end {% if t.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                R$ {{ t.amount|floatformat:2|intcomma }}
+              </td>
             </tr>
-            {% empty %}
-            <tr><td colspan="7" class="text-muted">Sem lançamentos no mês.</td></tr>
             {% endfor %}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <span class="text-muted">Sem lançamentos recentes.</span>
+      {% endif %}
     </div>
   </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Valores crus do backend, mas deslocalizados para JS (sem vírgulas).
-  const inPaid  = parseFloat('{{ total_in_paid|default:0|unlocalize }}')  || 0;
-  const exPaidA = Math.abs(parseFloat('{{ total_ex_paid|default:0|unlocalize }}')) || 0;
-  const inPrev  = parseFloat('{{ total_in|default:0|unlocalize }}')      || 0;
-  const exPrevA = Math.abs(parseFloat('{{ total_ex|default:0|unlocalize }}')) || 0;
+document.addEventListener("DOMContentLoaded", function () {
+  // Helper: sincroniza aria/ícone de TODOS os botões que apontam para um collapse
+  function syncButtonsFor(el, isOpen){
+    const sel = '#' + el.id;
+    document.querySelectorAll(`.collapse-toggle[data-collapse-target="${sel}"]`).forEach(btn=>{
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      const icon = btn.querySelector('.rotate-icon');
+      if (icon) icon.classList.toggle('rotated', isOpen);
+    });
+  }
 
-  // Usar pagos se houver; senão, previstos
-  let r = inPaid, d = exPaidA, label = ' (Pagos)';
-  if ((r + d) === 0) { r = inPrev; d = exPrevA; label = ' (Previstos)'; }
+  // Toggle manual robusto (sem depender de data-bs-toggle)
+  function toggleCollapse(sel){
+    const el = document.querySelector(sel);
+    if(!el) return;
+    if (window.bootstrap && bootstrap.Collapse){
+      const inst = bootstrap.Collapse.getOrCreateInstance(el, {toggle:false});
+      if (el.classList.contains('show')) inst.hide(); else inst.show();
+    } else {
+      el.classList.toggle('show');
+      syncButtonsFor(el, el.classList.contains('show'));
+    }
+  }
 
-  const pieEl   = document.getElementById('pie');
-  const titleEl = document.getElementById('pie-title');
+  // Liga botões individuais
+  document.querySelectorAll('.collapse-toggle').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const sel = btn.getAttribute('data-collapse-target');
+      const el  = document.querySelector(sel);
+      if (!el) return;
 
-  if (!pieEl) {
-    console.error('Canvas #pie não encontrado');
-  } else if (typeof Chart === 'undefined') {
-    console.error('Chart.js não carregado');
-  } else if ((r + d) === 0) {
-    const card = pieEl.closest('.card-body');
-    if (card) card.innerHTML = '<div class="text-muted">Sem dados para exibir.</div>';
-  } else {
-    if (titleEl) titleEl.innerHTML = 'Receitas vs Despesas <small class="text-muted">'+label+'</small>';
+      // estado atual antes de togglar
+      const willOpen = !el.classList.contains('show');
 
-    new Chart(pieEl, {
-      type: 'doughnut',
-      data: {
-        labels: ['Receitas', 'Despesas'],
-        datasets: [{
-          data: [r, d],  // despesas sempre em módulo
-          backgroundColor: ['#2563eb', '#fecaca'],
-          borderColor: ['#1d4ed8', '#fca5a5'],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        maintainAspectRatio: false,  // usa a altura do canvas
-        cutout: '55%',
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const val = ctx.parsed;
-                const total = r + d;
-                const pct = total ? (val / total * 100) : 0;
-                const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val);
-                return `${ctx.label}: ${brl} (${pct.toFixed(1)}%)`;
-              }
-            }
-          }
-        }
+      // gira o ícone imediatamente (feedback instantâneo)
+      const icon = btn.querySelector('.rotate-icon');
+      if (icon) icon.classList.toggle('rotated', willOpen);
+      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+
+      // segue com o toggle “oficial”
+      toggleCollapse(sel);
+    });
+  });
+
+
+  // Eventos Bootstrap para manter ícone/aria sincronizados mesmo com transições
+  document.querySelectorAll('.collapse').forEach(el=>{
+    el.addEventListener('shown.bs.collapse', ()=> syncButtonsFor(el, true));
+    el.addEventListener('hidden.bs.collapse', ()=> syncButtonsFor(el, false));
+    // Sincroniza estado inicial (se já vier com .show)
+    syncButtonsFor(el, el.classList.contains('show'));
+  });
+
+  // Expandir/Recolher em massa (se existir menu)
+  function setAll(open){
+    document.querySelectorAll('.collapse[id^="cat-"]').forEach(el=>{
+      if (window.bootstrap && bootstrap.Collapse){
+        const inst = bootstrap.Collapse.getOrCreateInstance(el, {toggle:false});
+        open ? inst.show() : inst.hide();
+      } else {
+        el.classList.toggle('show', open);
+        syncButtonsFor(el, open);
       }
     });
   }
-</script>
-
-
-{{ bar_labels|json_script:"bar-labels" }}
-{{ bar_values|json_script:"bar-values" }}
-
-<script>
-(function () {
-  const labels = JSON.parse(document.getElementById('bar-labels').textContent || '[]');
-  const values = JSON.parse(document.getElementById('bar-values').textContent || '[]');
-  const el = document.getElementById('bar-expenses');
-  if (!el) return;
-
-  if (!labels.length) {
-    const cardBody = el.closest('.card-body');
-    if (cardBody) cardBody.innerHTML += '<div class="text-muted">Sem despesas neste período.</div>';
-    return;
-  }
-
-  // === paleta dinâmica (light -> dark) ===
-  const LIGHT = { r: 254, g: 226, b: 226 }; // #fee2e2
-  const DARK  = { r: 185, g:  28, b:  28 }; // #b91c1c
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(max - min, 1e-9); // evita divisão por zero
-
-  const toColor = (v) => {
-    const t = (v - min) / span; // 0..1
-    const r = Math.round(LIGHT.r + t * (DARK.r - LIGHT.r));
-    const g = Math.round(LIGHT.g + t * (DARK.g - LIGHT.g));
-    const b = Math.round(LIGHT.b + t * (DARK.b - LIGHT.b));
-    return `rgb(${r}, ${g}, ${b})`;
-  };
-
-  // borda um pouco mais escura que o fundo
-  const darker = (rgb) => {
-    const m = rgb.match(/\d+/g).map(Number);
-    const f = 0.88;
-    return `rgb(${Math.round(m[0]*f)}, ${Math.round(m[1]*f)}, ${Math.round(m[2]*f)})`;
-  };
-
-  const bgColors = values.map(toColor);
-  const bdColors = bgColors.map(darker);
-
-  // plugin para rótulos em R$
-  const valueLabels = {
-    id: 'valueLabels',
-    afterDatasetsDraw(chart) {
-      const {ctx, chartArea} = chart;
-      const meta = chart.getDatasetMeta(0);
-      const data = chart.data.datasets[0].data;
-      ctx.save();
-      ctx.font = getComputedStyle(chart.canvas).font || '12px sans-serif';
-      ctx.textBaseline = 'middle';
-      meta.data.forEach((bar, i) => {
-        const val = data[i] ?? 0;
-        const txt = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val);
-        ctx.fillStyle = '#991b1b'; // rótulo fixo, bom contraste
-        const x = Math.min(bar.x + 8, chartArea.right - 4);
-        ctx.fillText(txt, x, bar.y);
-      });
-      ctx.restore();
+  document.body.addEventListener('click', (ev)=>{
+    const btn = ev.target.closest('[data-bulk]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-bulk');
+    if (action === 'expand') setAll(true);
+    if (action === 'collapse') setAll(false);
+    const menu = btn.closest('.dropdown-menu');
+    if (menu && window.bootstrap){
+      const toggle = menu.previousElementSibling;
+      if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
     }
-  };
-
-  new Chart(el, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        backgroundColor: bgColors,
-        borderColor: bdColors,
-        borderWidth: 1,
-        hoverBackgroundColor: bdColors,
-        hoverBorderColor: '#7f1d1d'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      layout: { padding: { right: 56 } },
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false }
-      },
-      scales: {
-        x: { display: false, grid: { display: false } },
-        y: { grid: { display: false }, ticks: { color: '#334155' } }
-      }
-    },
-    plugins: [valueLabels]
   });
-})();
+
+  // Reabre via hash (#algum-id) e sincroniza ícone
+  if (window.location.hash){
+    const el = document.querySelector(window.location.hash);
+    if (el && el.classList.contains('collapse')){
+      if (window.bootstrap && bootstrap.Collapse){
+        bootstrap.Collapse.getOrCreateInstance(el, {toggle:false}).show();
+      } else {
+        el.classList.add('show');
+        syncButtonsFor(el, true);
+      }
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }
+});
 </script>
-
-
 {% endblock %}
-
-
 
