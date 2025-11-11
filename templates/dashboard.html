@@ -130,48 +130,28 @@
   <div class="card-header bg-white border-0 py-2">
     <div class="d-flex justify-content-between align-items-center">
       <div class="d-flex align-items-center gap-2 collapse-toggle"
-            data-collapse-target="#dash-categorias"
-            aria-controls="dash-categorias"
-            aria-expanded="true"
-            role="button"
-            style="cursor:pointer;">
+           data-collapse-target="#dash-categorias"
+           aria-controls="dash-categorias"
+           aria-expanded="true"
+           role="button"
+           style="cursor:pointer;">
         <i class="bi bi-chevron-right rotate-icon rotated"></i>
         <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-bar-chart-line-fill text-danger"></i>
-            <span class="fw-semibold">Despesas por categoria</span>
+          <i class="bi bi-bar-chart-line-fill text-danger"></i>
+          <span class="fw-semibold">Despesas por categoria</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- aberto por padrão -->
   <div id="dash-categorias" class="collapse show">
-    <div class="card-body pt-0">
+    <div class="card-body pt-2">
       {% if ex_by_cat %}
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th style="width:60%">Categoria</th>
-                <th class="text-end" style="width:40%">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for item in ex_by_cat %}
-                {% if forloop.counter <= 10 %}
-                  <tr>
-                    <td class="d-flex align-items-center gap-2">
-                      <i class="bi bi-folder2 text-danger opacity-75"></i>
-                      <span>{{ item.name }}</span>
-                    </td>
-                    <td class="text-end text-danger">
-                      R$ {{ item.total|floatformat:2|intcomma }}
-                    </td>
-                  </tr>
-                {% endif %}
-              {% endfor %}
-            </tbody>
-          </table>
+        {{ bar_labels|json_script:"cat-labels" }}
+        {{ bar_values|json_script:"cat-values" }}
+
+        <div style="height: 200px;">
+          <canvas id="catChart"></canvas>
         </div>
       {% else %}
         <span class="text-muted">Sem dados para o mês.</span>
@@ -179,6 +159,9 @@
     </div>
   </div>
 </div>
+
+
+
 
 <!-- Lançamentos recentes -->
 <div class="card shadow-soft border-0">
@@ -218,7 +201,8 @@
           <tbody>
             {% for t in recent %}
             <tr>
-              <td>{{ t.date|date:"d/m/Y" }}</td>
+              <!-- <td>{{ t.date|date:"d/m/Y" }}</td> -->
+              <td>{{ t.updated_at|date:"d/m/Y" }}</td>
               <td>
                 {{ t.description }}
                 {% if t.is_fixed %}
@@ -352,5 +336,113 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 </script>
+
+<script>
+(function(){
+  function ensureScripts(urls, cb){
+    const next = urls.shift();
+    if (!next) { cb(); return; }
+    if (document.querySelector(`script[src="${next}"]`)) { ensureScripts(urls, cb); return; }
+    const s = document.createElement('script'); s.src = next; s.onload = ()=>ensureScripts(urls, cb);
+    document.head.appendChild(s);
+  }
+
+  ensureScripts([
+    "https://cdn.jsdelivr.net/npm/chart.js",
+    "https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"
+  ], function(){
+    const elLabels = document.getElementById('cat-labels');
+    const elValues = document.getElementById('cat-values');
+    if (!elLabels || !elValues) return;
+
+    // top 10
+    // top 10 ordenado por valor (decrescente)
+    let rawLabels = JSON.parse(elLabels.textContent || "[]");
+    let rawValues = JSON.parse(elValues.textContent || "[]").map(v => Math.abs(Number(v || 0)));
+
+    // combina e ordena
+    const combined = rawLabels.map((label, i) => ({ label, value: rawValues[i] || 0 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    let labels = combined.map(x => x.label);
+    let values = combined.map(x => x.value);
+
+
+    // paleta com alta transparência
+    const base = ["#ef4444","#f97316","#f59e0b","#eab308","#84cc16","#22c55e","#06b6d4","#3b82f6","#6366f1","#a855f7"];
+    const bg   = base.map(hex => hex + "33");  // ~20% (alpha)
+    const brd  = base;                         // borda sólida
+
+    const ctx = document.getElementById('catChart');
+    if (!ctx) return;
+    if (ctx._chartInstance) ctx._chartInstance.destroy();
+
+    // formatador BRL
+    const fmtBRL = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
+
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: bg,
+          borderColor: brd,
+          borderWidth: 1.5,
+          borderRadius: 6,
+          barPercentage: 0.7,
+          categoryPercentage: 0.65,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            grid: { color: '#f3f4f6' },
+            ticks: { color: '#6b7280', font: { size: 10 } }
+          },
+          y: {
+                beginAtZero: true,
+                grid: { color: '#f3f4f6' },
+                ticks: { display: false },
+                border: { display: false },
+                grace: '12%',
+              }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.label}: ${fmtBRL(ctx.parsed.y)}`
+            }
+          },
+          datalabels: {
+            anchor: 'end',
+            align: 'end',
+            offset: 0,
+            color: '#374151',
+            font: { weight: '500', size: 10 },
+            formatter: (v) => fmtBRL(v),
+            clamp: true,   // ⬅ mantém o rótulo dentro da área do chart
+            clip: false    // ⬅ evita que seja “cortado” pela borda
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+
+    ctx._chartInstance = chart;
+
+    // reacomoda ao expandir a seção
+    const col = document.getElementById('dash-categorias');
+    if (col) col.addEventListener('shown.bs.collapse', () => chart.resize());
+  });
+})();
+</script>
+
+
+
 {% endblock %}
 

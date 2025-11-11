@@ -113,7 +113,7 @@ def dashboard(request):
         "total_ex_pending": total_ex_pending,
 
         # Lista e contas
-        "recent": qs.order_by("-date", "-id")[:10],
+        "recent": qs.order_by("-updated_at", "-id")[:10],
         "account_balances": account_balances,
 
         # Dados do gráfico de barras de despesas por categoria

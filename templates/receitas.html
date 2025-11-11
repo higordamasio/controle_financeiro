@@ -58,23 +58,36 @@
   <div class="card shadow-soft mb-3">
     <div class="card-header bg-white border-0 py-2">
       <div class="d-flex justify-content-between align-items-center">
-        <button
-          type="button"
-          class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 collapse-toggle"
-          data-collapse-target="#cat-{{ sec.category.id }}"
-          aria-controls="cat-{{ sec.category.id }}"
-          aria-expanded="false">
-          <i class="bi bi-chevron-right rotate-icon"></i>
-          <i class="bi bi-folder2-open text-success"></i>
-          <span class="fw-semibold">{{ sec.category.name }}</span>
-          <span class="badge text-bg-secondary">{{ sec.txs|length }} itens</span>
-        </button>
+        <!-- GRUPO ESQUERDA: título + contador + botão + -->
+        <div class="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 collapse-toggle"
+            data-collapse-target="#cat-{{ sec.category.id }}"
+            aria-controls="cat-{{ sec.category.id }}"
+            aria-expanded="false">
+            <i class="bi bi-chevron-right rotate-icon"></i>
+            <i class="bi bi-folder2-open text-success"></i>
+            <span class="fw-semibold">{{ sec.category.name }}</span>
+            <span class="badge text-bg-secondary">{{ sec.txs|length }} itens</span>
+          </button>
 
+          <!-- + Nova transação (fora do botão de toggle) -->
+          <a href="{% url 'new_transaction' %}?category={{ sec.category.id }}&desc={{ sec.category.name|urlencode }}&next={{ request.get_full_path|urlencode }}#cat-{{ sec.category.id }}"
+            class="btn btn-success btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center"
+            style="width:26px;height:26px;"
+            data-bs-toggle="tooltip" data-bs-title="Nova transação" aria-label="Nova transação">
+            <i class="bi bi-plus-lg"></i>
+          </a>
+        </div>
+
+        <!-- Total à direita (inalterado) -->
         <button class="btn btn-sm btn-success disabled border-0 rounded-pill px-3">
           <small class="fw-semibold">Total: R$ {{ sec.total|floatformat:2|intcomma }}</small>
         </button>
       </div>
     </div>
+
 
     <!-- FECHADO por padrão -->
     <div id="cat-{{ sec.category.id }}" class="collapse">
@@ -165,6 +178,11 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  // tooltips Bootstrap
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{
+    new bootstrap.Tooltip(el);
+  });
+
   // Toggle manual robusto (sem depender de data-bs-toggle)
   function toggleCollapse(sel){
     const el = document.querySelector(sel);
@@ -235,4 +253,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 </script>
+
+
 {% endblock %}
