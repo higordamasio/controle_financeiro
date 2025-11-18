@@ -158,3 +158,6 @@ form .form-control:focus, form .form-select:focus {
 .card-title i { color: #3b82f6; }
 
 
+form select, form input[type=number] {
+    min-width: 70px;
+}
