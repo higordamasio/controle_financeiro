@@ -113,7 +113,7 @@ def dashboard(request):
         "total_ex_pending": total_ex_pending,
 
         # Lista e contas
-        "recent": qs.order_by("-date", "-id")[:10],
+        "recent": qs.order_by("-updated_at", "-id")[:10],
         "account_balances": account_balances,
 
         # Dados do gráfico de barras de despesas por categoria
@@ -326,6 +326,20 @@ def toggle_status(request, pk):
 @login_required
 def receipts_view(request):
     year, month = _period_from_request(request)
+
+    # ← navegação por mês (setinhas)
+    nav = request.GET.get("nav")
+    if nav == "prev":
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    elif nav == "next":
+        month += 1
+        if month == 13:
+            month = 1
+            year += 1
+
     sections = Category.objects.filter(kind="IN").order_by("name")
     tx = (
         Transaction.objects
@@ -353,6 +367,20 @@ def receipts_view(request):
 @login_required
 def expenses_view(request):
     year, month = _period_from_request(request)
+
+    # ← navegação por mês (setinhas)
+    nav = request.GET.get("nav")
+    if nav == "prev":
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    elif nav == "next":
+        month += 1
+        if month == 13:
+            month = 1
+            year += 1
+
     sections = Category.objects.filter(kind="EX").order_by("name")
     tx = (
         Transaction.objects

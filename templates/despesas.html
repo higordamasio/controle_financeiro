@@ -5,41 +5,74 @@
 
 {% block content %}
 <style>
-  .rotate-icon { transition: transform 0.25s ease; }
-  .rotate-icon.rotated { transform: rotate(90deg); }
+  /* ícones que rotacionam */
+  .rotate-icon {
+    transition: transform .25s ease;
+  }
+  .rotate-icon.rotated {
+    transform: rotate(90deg);
+  }
+
+  /* 🔹 Chip azul do período */
+  .period-chip {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eaf1ff;                   /* azul clarinho */
+    border: 1px solid #bcd2ff;             /* tom da borda */
+  }
+
+  /* remove bordas internas */
+  .period-chip select,
+  .period-chip input[type="number"] {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 3px;
+    height: 24px;
+    font-size: 0.85rem;
+  }
+
+  .period-chip select:focus,
+  .period-chip input[type="number"]:focus {
+    outline: none;
+  }
+
+  /* botões das setas */
+  .period-chip .nav-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: #0d6efd;        /* azul principal Bootstrap */
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background .2s ease;
+  }
+
+  .period-chip .nav-btn:hover {
+    background: #0b5ed7;        /* azul mais escuro */
+  }
+
+  .period-chip .nav-btn i {
+    font-size: .8rem;
+  }
 </style>
+
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h3 class="mb-0 d-flex align-items-center gap-2">
     <i class="bi bi-wallet2 text-danger"></i> Despesas
+    <span class="badge text-bg-light">Mês: {{ month|stringformat:"02d" }}/{{ year }}</span>
   </h3>
 
   <div class="d-flex align-items-center gap-2 flex-wrap">
 
-    <div class="dropdown">
-      <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown">
-        <i class="bi bi-list"></i> Ações
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><button class="dropdown-item" data-bulk="expand"><i class="bi bi-arrows-expand me-1"></i> Expandir todas</button></li>
-        <li><button class="dropdown-item" data-bulk="collapse"><i class="bi bi-arrows-collapse me-1"></i> Recolher todas</button></li>
-      </ul>
-    </div>
-
-    <a class="btn btn-primary btn-sm d-flex align-items-center gap-1" href="{% url 'add_section' %}?kind=EX">
-      <i class="bi bi-plus-circle"></i> Add Seção
-    </a>
-
-    <form action="" method="get" class="d-flex align-items-center gap-2">
-      <select name="month" class="form-select form-select-sm">
-        {% for m in months %}
-          <option value="{{ m }}" {% if m == month %}selected{% endif %}>Mês {{ m|stringformat:"02d" }}</option>
-        {% endfor %}
-      </select>
-      <input type="number" name="year" class="form-control form-control-sm" style="width: 90px" value="{{ year }}">
-      <button class="btn btn-outline-primary btn-sm">Filtrar</button>
-      <span class="badge text-bg-light">Mês: {{ month|stringformat:"02d" }}/{{ year }}</span>
-    </form>
     <form method="post" action="{% url 'import_fixed' 'EX' %}" class="d-flex align-items-center gap-2">
       {% csrf_token %}
       <input type="hidden" name="year" value="{{ year }}">
@@ -48,6 +81,57 @@
         <i class="bi bi-cloud-download me-1"></i> Importar fixas
       </button>
     </form>
+
+    <!-- Dropdown: criar seção -->
+    <div class="dropdown">
+      <button class="btn btn-outline-primary dropdown-toggle btn-sm" data-bs-toggle="dropdown">
+        + Add Seção
+      </button>
+      <div class="dropdown-menu dropdown-menu-end p-3" style="min-width:280px">
+        <form method="get" action="{% url 'add_section' %}" class="d-flex gap-2">
+          <input type="hidden" name="kind" value="EX">
+          <input class="form-control" name="name" placeholder="Nome da seção (ex: Despesas Fixas)">
+          <button class="btn btn-primary" type="submit">Criar</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="dropdown">
+      <button class="btn btn-outline-primary btn-sm dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown">
+        <i class="bi bi-list"></i> Ações
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button class="dropdown-item btn btn-outline-primary btn-sm" data-bulk="expand"><i class="bi bi-arrows-expand me-1"></i> Expandir todas</button></li>
+        <li><button class="dropdown-item btn btn-outline-primary btn-sm" data-bulk="collapse"><i class="bi bi-arrows-collapse me-1"></i> Recolher todas</button></li>
+      </ul>
+    </div>
+
+    <form action="" method="get" class="d-flex align-items-center gap-2">
+      <div class="period-chip">
+        <!-- mês anterior -->
+        <button type="submit" name="nav" value="prev" class="nav-btn" title="Mês anterior">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <!-- MÊS -->
+        <select name="month">
+          {% for m in months %}
+            <option value="{{ m }}" {% if m == month %}selected{% endif %}>
+              {{ m|stringformat:"02d" }}
+            </option>
+          {% endfor %}
+        </select>
+        <!-- ANO bem coladinho -->
+        <input type="number" name="year" value="{{ year }}" style="width:50px">
+        <!-- próximo mês -->
+        <button type="submit" name="nav" value="next" class="nav-btn" title="Próximo mês">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+      <button class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-funnel me-1"></i> Filtrar
+      </button>
+    </form>
+
   </div>
 </div>
 
@@ -55,23 +139,33 @@
   <div class="card shadow-soft mb-3">
     <div class="card-header bg-white border-0 py-2">
       <div class="d-flex justify-content-between align-items-center">
-        <button
-          type="button"
-          class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 collapse-toggle"
-          data-collapse-target="#cat-{{ sec.category.id }}"
-          aria-controls="cat-{{ sec.category.id }}"
-          aria-expanded="false">
-          <i class="bi bi-chevron-right rotate-icon"></i>
-          <i class="bi bi-folder2-open text-danger"></i>
-          <span class="fw-semibold">{{ sec.category.name }}</span>
-          <span class="badge text-bg-secondary">{{ sec.txs|length }} itens</span>
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 collapse-toggle"
+            data-collapse-target="#cat-{{ sec.category.id }}"
+            aria-controls="cat-{{ sec.category.id }}"
+            aria-expanded="false">
+            <i class="bi bi-chevron-right rotate-icon"></i>
+            <i class="bi bi-folder2-open text-danger"></i>
+            <span class="fw-semibold">{{ sec.category.name }}</span>
+            <span class="badge text-bg-secondary">{{ sec.txs|length }} itens</span>
+          </button>
+
+          <a href="{% url 'new_transaction' %}?category={{ sec.category.id }}&desc={{ sec.category.name|urlencode }}&next={{ request.get_full_path|urlencode }}#cat-{{ sec.category.id }}"
+            class="btn btn-success btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center"
+            style="width:26px;height:26px;"
+            data-bs-toggle="tooltip" data-bs-title="Nova transação" aria-label="Nova transação">
+            <i class="bi bi-plus-lg"></i>
+          </a>
+        </div>
 
         <button class="btn btn-sm btn-danger disabled border-0 rounded-pill px-3">
           <small class="fw-semibold">Total: R$ {{ sec.total|floatformat:2|intcomma }}</small>
         </button>
       </div>
     </div>
+
 
     <!-- FECHADO por padrão -->
     <div id="cat-{{ sec.category.id }}" class="collapse">
