@@ -41,6 +41,21 @@ MONTHS = list(range(1, 13))
 def dashboard(request):
     year, month = _period_from_request(request)
 
+    # 🔹 navegação pelos botões do formulário
+    nav = request.GET.get("nav")
+
+    if nav == "prev":
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+
+    elif nav == "next":
+        month += 1
+        if month == 13:
+            month = 1
+            year += 1
+
     qs = (
         Transaction.objects
         .filter(date__year=year, date__month=month, account__owner=request.user)
@@ -84,6 +99,7 @@ def dashboard(request):
     totals_pending = qs_pending.values("category__kind").annotate(total=Sum("amount"))
     total_in_pending = sum(t["total"] for t in totals_pending if t["category__kind"] == "IN") or Decimal("0")
     total_ex_pending = sum(t["total"] for t in totals_pending if t["category__kind"] == "EX") or Decimal("0")
+    total_ex_pending_abs = abs(total_ex_pending)
 
     # Saldos por conta (geral, não filtrado por mês) — como você já tinha
     accounts = Account.objects.filter(owner=request.user)
@@ -111,6 +127,7 @@ def dashboard(request):
         "net_paid": net_paid,
         "total_in_pending": total_in_pending,
         "total_ex_pending": total_ex_pending,
+        "total_ex_pending_abs": total_ex_pending_abs,
 
         # Lista e contas
         "recent": qs.order_by("-updated_at", "-id")[:10],
@@ -388,12 +405,25 @@ def expenses_view(request):
         .select_related("category", "account")
     )
 
-    by_cat = {c.id: {"category": c, "txs": [], "total": Decimal("0")} for c in sections}
+    by_cat = {
+        c.id: {
+            "category": c,
+            "txs": [],
+            "total": Decimal("0"),
+            "all_paid": False,
+        }
+        for c in sections
+    }
     for t in tx.filter(category__kind="EX"):
         b = by_cat.get(t.category_id)
         if b:
             b["txs"].append(t)
             b["total"] += t.amount
+
+    for section in by_cat.values():
+        section["all_paid"] = bool(section["txs"]) and all(
+            t.status == TransactionStatus.PAID for t in section["txs"]
+        )
 
     context = {
         "page_title": "Despesas",

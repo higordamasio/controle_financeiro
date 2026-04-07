@@ -160,7 +160,7 @@
           </a>
         </div>
 
-        <button class="btn btn-sm btn-danger disabled border-0 rounded-pill px-3">
+        <button class="btn btn-sm {% if sec.all_paid %}btn-success{% else %}btn-danger{% endif %} disabled border-0 rounded-pill px-3">
           <small class="fw-semibold">Total: R$ {{ sec.total|floatformat:2|intcomma }}</small>
         </button>
       </div>
